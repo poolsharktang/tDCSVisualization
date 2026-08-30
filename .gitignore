@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+simnibs4_examples.zip
+simnibs4_examples/m2m_*/
+simnibs4_examples/org/
+simnibs4_examples/tdcs_*/
+simnibs4_examples/_tdcs_gui_last_config.json
