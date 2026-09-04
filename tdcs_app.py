@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QPen,
+    QPixmap,
     QPolygonF,
 )
 from PySide6.QtWidgets import (
@@ -63,11 +64,12 @@ EEG_CHANNELS = [
 ]
 
 # Hardware Ch1–Ch8 default 10-10 locations. EEG and tES share these sites.
+# Ch1/Ch8 = source = return electrodes; Ch2-Ch7 = sink = stimulation electrodes.
 DEFAULT_EEG = ["POz", "P1", "P2", "O2", "O1", "Fp1", "Fp2", "Cz"]
-STIM_CHANNELS = (1, 8)
-RETURN_CHANNELS = (2, 3, 4, 5, 6, 7)
-DEFAULT_STIM = {1}
-DEFAULT_RETURN = {2, 3, 4, 5}
+STIM_CHANNELS = (2, 3, 4, 5, 6, 7)
+RETURN_CHANNELS = (1, 8)
+DEFAULT_STIM = {2, 3, 4, 5}
+DEFAULT_RETURN = {1}
 
 SOURCE_COLOR = QColor("#c0392b")
 SINK_COLOR = QColor("#1d4ed8")
@@ -79,22 +81,31 @@ HEAD_LINE = QColor("#2c3e50")
 
 STYLESHEET = """
 QMainWindow, QWidget {
-    background: #e8edf3;
+    background-color: #e8edf3;
     color: #1b2430;
-    font-family: "Segoe UI";
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
     font-size: 13px;
 }
+QFrame#HeaderBar {
+    background-color: #ffffff;
+    border: none;
+    border-bottom: 2px solid #0f766e;
+}
+QFrame#HeaderBar QLabel {
+    background-color: transparent;
+}
 QLabel#AppTitle {
-    color: #f8fafc;
+    color: #134e4a;
     font-size: 20px;
     font-weight: 700;
 }
 QLabel#AppSubtitle {
-    color: #c5d0de;
+    color: #475569;
     font-size: 12px;
 }
-QFrame#HeaderBar {
-    background: #152238;
+QStatusBar {
+    background-color: #ffffff;
+    color: #1b2430;
 }
 QGroupBox {
     background: #ffffff;
@@ -233,9 +244,9 @@ def current_table(
     source_ma = total_ma / len(stim_chs)
     sink_ma = -total_ma / len(return_chs)
     for ch in stim_chs:
-        rows.append((ch, eeg_names[ch - 1], "Stim", source_ma))
+        rows.append((ch, eeg_names[ch - 1], "刺激", source_ma))
     for ch in return_chs:
-        rows.append((ch, eeg_names[ch - 1], "Return", sink_ma))
+        rows.append((ch, eeg_names[ch - 1], "回流", sink_ma))
     return rows
 
 
@@ -313,9 +324,9 @@ class MontageWidget(QWidget):
         painter.drawPath(right_ear)
 
         electrode_r = max(11.0, 0.072 * scale)
-        name_font = QFont("Segoe UI", max(7, min(9, int(scale * 0.048))))
+        name_font = QFont("Microsoft YaHei UI", max(7, min(9, int(scale * 0.048))))
         name_font.setBold(True)
-        badge_font = QFont("Segoe UI", max(7, min(9, int(scale * 0.042))))
+        badge_font = QFont("Microsoft YaHei UI", max(7, min(9, int(scale * 0.042))))
         badge_font.setBold(True)
 
         for name, pos in self.xy.items():
@@ -358,8 +369,8 @@ class MontageWidget(QWidget):
                 )
 
         painter.setPen(QPen(QColor("#64748b")))
-        painter.setFont(QFont("Segoe UI", 10))
-        hint = "Red = stim  ·  Blue = return  ·  Teal = EEG only  ·  Badge = hardware channel"
+        painter.setFont(QFont("Microsoft YaHei UI", 10))
+        hint = "红=刺激  ·  蓝=回流  ·  青绿=仅 EEG  ·  角标=硬件通道"
         if self._hover:
             ch = self.channel_of.get(self._hover)
             extra = f"Ch{ch}  " if ch is not None else ""
@@ -384,7 +395,7 @@ class MontageWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("8-ch EEG + tES Simulation")
+        self.setWindowTitle("8通道 EEG + tES 仿真")
         self.resize(1420, 920)
         self._output_edited = False
         self._updating_combos = False
@@ -407,15 +418,30 @@ class MainWindow(QMainWindow):
 
         header = QFrame()
         header.setObjectName("HeaderBar")
-        header.setFixedHeight(72)
-        header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(22, 10, 22, 10)
-        title = QLabel("8-channel EEG + tES")
+        header.setFixedHeight(80)
+        header.setAutoFillBackground(True)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(18, 10, 22, 10)
+        header_layout.setSpacing(14)
+
+        logo_label = QLabel()
+        logo_path = ROOT / "logo.jpg"
+        if logo_path.is_file():
+            pixmap = QPixmap(str(logo_path))
+            if not pixmap.isNull():
+                logo_label.setPixmap(pixmap.scaledToHeight(52, Qt.SmoothTransformation))
+        logo_label.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(logo_label)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        title = QLabel("8通道 EEG + tES")
         title.setObjectName("AppTitle")
-        subtitle = QLabel("Assign 8 shared EEG/tES electrodes, then check stim (Ch1/Ch8) and return (Ch2-Ch7)")
+        subtitle = QLabel("先指定 8 个共用电极，再勾选回流通道（Ch1/Ch8）和刺激通道（Ch2-Ch7）")
         subtitle.setObjectName("AppSubtitle")
-        header_layout.addWidget(title)
-        header_layout.addWidget(subtitle)
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        header_layout.addLayout(title_box, 1)
         root_layout.addWidget(header)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -443,12 +469,12 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 4, 0)
         right_layout.setSpacing(8)
 
-        eeg_box = QGroupBox("EEG / tES Electrodes")
+        eeg_box = QGroupBox("EEG / tES 电极")
         eeg_layout = QVBoxLayout(eeg_box)
         hint = QLabel(
-            "EEG and tES share these 8 sites. Electrode names cannot be duplicated.\n"
-            "Ch1 and Ch8: check 1 or both as stimulation.\n"
-            "Ch2-Ch7: check at least one as return."
+            "EEG 与 tES 共用这 8 个电极位置，名称不能重复。\n"
+            "Ch1 和 Ch8：勾选 1 个或 2 个作为回流电极。\n"
+            "Ch2-Ch7：至少勾选 1 个作为刺激电极。"
         )
         hint.setObjectName("HintLabel")
         hint.setWordWrap(True)
@@ -457,9 +483,9 @@ class MainWindow(QMainWindow):
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(6)
-        grid.addWidget(QLabel("Channel"), 0, 0)
-        grid.addWidget(QLabel("10-10 site"), 0, 1)
-        grid.addWidget(QLabel("tES role"), 0, 2)
+        grid.addWidget(QLabel("通道"), 0, 0)
+        grid.addWidget(QLabel("10-10 位置"), 0, 1)
+        grid.addWidget(QLabel("tES 角色"), 0, 2)
 
         self.electrode_combos: list[QComboBox] = []
         self.role_checks: dict[int, QCheckBox] = {}
@@ -474,11 +500,11 @@ class MainWindow(QMainWindow):
             self.electrode_combos.append(combo)
 
             if ch in STIM_CHANNELS:
-                check = QCheckBox("Stimulation")
+                check = QCheckBox("刺激")
                 check.setObjectName("StimCheck")
                 check.setChecked(ch in DEFAULT_STIM)
             else:
-                check = QCheckBox("Return")
+                check = QCheckBox("回流")
                 check.setObjectName("ReturnCheck")
                 check.setChecked(ch in DEFAULT_RETURN)
             check.toggled.connect(self._sync_view)
@@ -490,7 +516,7 @@ class MainWindow(QMainWindow):
             grid.addWidget(check, row, 2)
 
         eeg_layout.addLayout(grid)
-        reset_btn = QPushButton("Reset default montage")
+        reset_btn = QPushButton("恢复默认电极")
         reset_btn.clicked.connect(self._reset_montage)
         eeg_layout.addWidget(reset_btn, 0, Qt.AlignLeft)
         self.warn_label = QLabel()
@@ -499,7 +525,7 @@ class MainWindow(QMainWindow):
         eeg_layout.addWidget(self.warn_label)
         right_layout.addWidget(eeg_box)
 
-        stim_box = QGroupBox("Stimulation")
+        stim_box = QGroupBox("刺激参数")
         stim_form = QFormLayout(stim_box)
         self.current_spin = QDoubleSpinBox()
         self.current_spin.setRange(0.05, 4.0)
@@ -508,17 +534,18 @@ class MainWindow(QMainWindow):
         self.current_spin.setValue(2.0)
         self.current_spin.setSuffix(" mA")
         self.current_spin.valueChanged.connect(self._sync_view)
-        stim_form.addRow("Total current", self.current_spin)
-        current_hint = QLabel("Stim current is split equally across checked Ch1/Ch8.\nReturn current is split equally across checked Ch2-Ch7.")
+        stim_form.addRow("总电流", self.current_spin)
+        current_hint = QLabel("刺激电流在已勾选的 Ch2-Ch7 之间均分。\n回流电流在已勾选的 Ch1/Ch8 之间均分。")
         current_hint.setObjectName("HintLabel")
         stim_form.addRow(current_hint)
         right_layout.addWidget(stim_box)
 
-        elec_box = QGroupBox("Electrode")
+        elec_box = QGroupBox("电极参数")
         elec_form = QFormLayout(elec_box)
         self.shape_combo = QComboBox()
-        self.shape_combo.addItems(["Circular", "Rectangular"])
-        self.shape_combo.currentTextChanged.connect(self._on_shape_changed)
+        self.shape_combo.addItem("圆形", "ellipse")
+        self.shape_combo.addItem("矩形", "rect")
+        self.shape_combo.currentIndexChanged.connect(self._on_shape_changed)
         self.diameter_spin = QDoubleSpinBox()
         self.diameter_spin.setRange(5.0, 80.0)
         self.diameter_spin.setDecimals(1)
@@ -539,18 +566,18 @@ class MainWindow(QMainWindow):
         self.thickness_spin.setDecimals(1)
         self.thickness_spin.setValue(4.0)
         self.thickness_spin.setSuffix(" mm")
-        elec_form.addRow("Shape", self.shape_combo)
-        self.diameter_label = QLabel("Diameter")
+        elec_form.addRow("形状", self.shape_combo)
+        self.diameter_label = QLabel("直径")
         elec_form.addRow(self.diameter_label, self.diameter_spin)
-        self.width_label = QLabel("Width")
-        self.height_label = QLabel("Height")
+        self.width_label = QLabel("宽度")
+        self.height_label = QLabel("高度")
         elec_form.addRow(self.width_label, self.width_spin)
         elec_form.addRow(self.height_label, self.height_spin)
-        elec_form.addRow("Thickness", self.thickness_spin)
+        elec_form.addRow("厚度", self.thickness_spin)
         right_layout.addWidget(elec_box)
-        self._on_shape_changed(self.shape_combo.currentText())
+        self._on_shape_changed()
 
-        sim_box = QGroupBox("Simulation")
+        sim_box = QGroupBox("仿真设置")
         sim_form = QFormLayout(sim_box)
         self.work_edit = QLineEdit(str(EXAMPLES_DIR))
         self.work_edit.editingFinished.connect(self._refresh_head_models)
@@ -559,30 +586,30 @@ class MainWindow(QMainWindow):
         self.output_edit = QLineEdit("tdcs_POz_4return")
         self.output_edit.textEdited.connect(self._on_output_edited)
         self.fields_edit = QLineEdit("veEjJ")
-        self.gmsh_check = QCheckBox("Open results in Gmsh")
+        self.gmsh_check = QCheckBox("完成后用 Gmsh 打开结果")
         self.gmsh_check.setChecked(True)
-        self.vol_check = QCheckBox("Map fields to MRI volume")
+        self.vol_check = QCheckBox("将场映射到 MRI 体积")
         self.python_edit = QLineEdit(find_simnibs_python())
         python_row = self._browse_row(self.python_edit, self._browse_python)
-        sim_form.addRow("Working directory", work_row)
-        sim_form.addRow("Head model", self.model_combo)
-        sim_form.addRow("Output folder", self.output_edit)
-        sim_form.addRow("Fields", self.fields_edit)
+        sim_form.addRow("工作目录", work_row)
+        sim_form.addRow("头模型", self.model_combo)
+        sim_form.addRow("输出文件夹", self.output_edit)
+        sim_form.addRow("输出场量", self.fields_edit)
         sim_form.addRow(self.gmsh_check)
         sim_form.addRow(self.vol_check)
         sim_form.addRow("SimNIBS Python", python_row)
         right_layout.addWidget(sim_box)
 
-        table_box = QGroupBox("Channel Currents")
+        table_box = QGroupBox("通道电流")
         table_layout = QVBoxLayout(table_box)
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Ch", "Electrode", "Role", "Current"])
+        self.table.setHorizontalHeaderLabels(["通道", "电极", "角色", "电流"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setMinimumHeight(150)
-        self.sum_label = QLabel("Sum: 0.000 mA")
+        self.sum_label = QLabel("合计: 0.000 mA")
         table_layout.addWidget(self.table)
         table_layout.addWidget(self.sum_label)
         right_layout.addWidget(table_box)
@@ -591,14 +618,14 @@ class MainWindow(QMainWindow):
         right_panel_layout.addWidget(right_scroll, 1)
 
         btn_row = QHBoxLayout()
-        self.run_btn = QPushButton("Run Simulation")
+        self.run_btn = QPushButton("开始建模")
         self.run_btn.setObjectName("PrimaryButton")
         self.run_btn.clicked.connect(self._run_simulation)
-        self.stop_btn = QPushButton("Stop")
+        self.stop_btn = QPushButton("停止")
         self.stop_btn.setObjectName("DangerButton")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop_simulation)
-        self.open_btn = QPushButton("Open Output")
+        self.open_btn = QPushButton("打开结果")
         self.open_btn.clicked.connect(self._open_output)
         btn_row.addWidget(self.run_btn, 2)
         btn_row.addWidget(self.stop_btn)
@@ -615,24 +642,24 @@ class MainWindow(QMainWindow):
         self.log.setObjectName("LogView")
         self.log.setReadOnly(True)
         self.log.setMaximumHeight(180)
-        self.log.setPlaceholderText("Simulation log will appear here.")
+        self.log.setPlaceholderText("仿真日志将显示在这里。")
         body_layout.addWidget(self.log)
         root_layout.addWidget(body, 1)
         self.setCentralWidget(root)
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage("就绪")
 
     def _browse_row(self, edit: QLineEdit, handler) -> QWidget:
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(edit, 1)
-        btn = QPushButton("Browse")
+        btn = QPushButton("浏览")
         btn.clicked.connect(handler)
         layout.addWidget(btn)
         return row
 
-    def _on_shape_changed(self, shape: str) -> None:
-        circular = shape == "Circular"
+    def _on_shape_changed(self, _index: int = 0) -> None:
+        circular = self.shape_combo.currentData() != "rect"
         self.diameter_spin.setVisible(circular)
         self.diameter_label.setVisible(circular)
         self.width_spin.setVisible(not circular)
@@ -688,11 +715,11 @@ class MainWindow(QMainWindow):
 
     def _montage_error(self) -> str | None:
         if len(set(self.eeg_names)) != 8:
-            return "Each of the 8 channels must use a different electrode."
+            return "8 个通道必须使用不同的电极位置。"
         if not self._stim_channels():
-            return "Select Ch1, Ch8, or both as stimulation electrodes."
+            return "请至少勾选 Ch2-Ch7 中的一个刺激电极。"
         if not self._return_channels():
-            return "Select at least one return electrode from Ch2-Ch7."
+            return "请勾选 Ch1、Ch8，或两者都勾选作为回流电极。"
         return None
 
     def _auto_output_name(self) -> str:
@@ -725,17 +752,17 @@ class MainWindow(QMainWindow):
             values = [f"Ch{channel}", name, role, f"{amp:+.4f} mA"]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
-                if role == "Stim":
+                if role == "刺激":
                     item.setForeground(SOURCE_COLOR)
-                elif role == "Return":
+                elif role == "回流":
                     item.setForeground(SINK_COLOR)
                 self.table.setItem(i, col, item)
         self.table.resizeColumnsToContents()
-        self.sum_label.setText(f"Sum: {total:+.6f} mA")
+        self.sum_label.setText(f"合计: {total:+.6f} mA")
 
         stim_n = len(self._stim_channels())
         ret_n = len(self._return_channels())
-        self.statusBar().showMessage(f"{stim_n} stim, {ret_n} return  ·  8 shared EEG/tES electrodes")
+        self.statusBar().showMessage(f"刺激 {stim_n} 个，回流 {ret_n} 个  ·  8 通道 EEG/tES 共用电极")
 
     def _refresh_head_models(self) -> None:
         work = Path(self.work_edit.text().strip() or EXAMPLES_DIR)
@@ -753,7 +780,7 @@ class MainWindow(QMainWindow):
         self.model_combo.addItem("m2m_ernie")
 
     def _browse_workdir(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "Select SimNIBS working directory", self.work_edit.text())
+        path = QFileDialog.getExistingDirectory(self, "选择 SimNIBS 工作目录", self.work_edit.text())
         if path:
             self.work_edit.setText(path)
             self._refresh_head_models()
@@ -761,15 +788,15 @@ class MainWindow(QMainWindow):
     def _browse_python(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select SimNIBS Python",
+            "选择 SimNIBS Python",
             self.python_edit.text() or str(Path.home()),
-            "Python (python.exe);;All files (*.*)",
+            "Python (python.exe);;所有文件 (*.*)",
         )
         if path:
             self.python_edit.setText(path)
 
     def _config(self) -> dict:
-        circular = self.shape_combo.currentText() == "Circular"
+        circular = self.shape_combo.currentData() != "rect"
         stim_chs = self._stim_channels()
         return_chs = self._return_channels()
         return {
@@ -797,24 +824,24 @@ class MainWindow(QMainWindow):
             return error
         python_path = Path(self.python_edit.text().strip())
         if not python_path.is_file():
-            return "SimNIBS Python was not found. Browse to simnibs_env/python.exe."
+            return "未找到 SimNIBS Python。请浏览到 simnibs_env/python.exe。"
         if not RUNNER_SCRIPT.is_file():
-            return f"Runner script missing: {RUNNER_SCRIPT}"
+            return f"缺少仿真脚本: {RUNNER_SCRIPT}"
         work = Path(self.work_edit.text().strip())
         if not work.is_dir():
-            return "Working directory does not exist."
+            return "工作目录不存在。"
         model = work / (self.model_combo.currentText() or "m2m_ernie")
         if not model.is_dir():
-            return f"Head model not found: {model}"
+            return f"未找到头模型: {model}"
         return None
 
     def _run_simulation(self) -> None:
         error = self._validate()
         if error:
-            QMessageBox.warning(self, "Cannot run simulation", error)
+            QMessageBox.warning(self, "无法开始仿真", error)
             return
         if self.process.state() != QProcess.NotRunning:
-            QMessageBox.information(self, "Busy", "A simulation is already running.")
+            QMessageBox.information(self, "正在运行", "已有仿真正在进行。")
             return
 
         work = Path(self.work_edit.text().strip())
@@ -823,9 +850,9 @@ class MainWindow(QMainWindow):
         config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
         self.log.clear()
-        self._append_log(f"Working directory: {work}")
+        self._append_log(f"工作目录: {work}")
         self._append_log(f"SimNIBS Python: {self.python_edit.text()}")
-        self._append_log(f"Config: {config_path}")
+        self._append_log(f"配置文件: {config_path}")
         self._append_log("-" * 48)
 
         env = QProcessEnvironment.systemEnvironment()
@@ -836,17 +863,17 @@ class MainWindow(QMainWindow):
         self.process.setArguments([str(RUNNER_SCRIPT), str(config_path)])
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.statusBar().showMessage("Simulation running...")
+        self.statusBar().showMessage("正在仿真...")
         self.process.start()
         if not self.process.waitForStarted(5000):
             self.stop_btn.setEnabled(False)
             self._sync_view()
-            QMessageBox.critical(self, "Failed to start", self.process.errorString())
+            QMessageBox.critical(self, "启动失败", self.process.errorString())
 
     def _stop_simulation(self) -> None:
         if self.process.state() != QProcess.NotRunning:
             self.process.kill()
-            self._append_log("\nSimulation stopped by user.")
+            self._append_log("\n仿真已被用户停止。")
 
     def _on_process_output(self) -> None:
         data = bytes(self.process.readAllStandardOutput())
@@ -858,17 +885,17 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         self._sync_view()
         if exit_code == 0:
-            self.statusBar().showMessage("Simulation finished")
-            self._append_log("\nDone.")
+            self.statusBar().showMessage("仿真完成")
+            self._append_log("\n完成。")
         else:
-            self.statusBar().showMessage(f"Simulation failed (exit {exit_code})")
-            self._append_log(f"\nProcess exited with code {exit_code}.")
+            self.statusBar().showMessage(f"仿真失败（退出码 {exit_code}）")
+            self._append_log(f"\n进程退出码 {exit_code}。")
 
     def _open_output(self) -> None:
         work = Path(self.work_edit.text().strip())
         output = work / (self.output_edit.text().strip() or "tdcs_gui_results")
         if not output.exists():
-            QMessageBox.information(self, "Not found", f"Output folder does not exist yet:\n{output}")
+            QMessageBox.information(self, "未找到", f"输出文件夹还不存在:\n{output}")
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(output)))
 

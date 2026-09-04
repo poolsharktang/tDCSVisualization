@@ -82,10 +82,10 @@ def run_from_config(config: dict) -> None:
     print(f"Open Gmsh  : {session.open_in_gmsh}")
     print(f"Map to vol : {session.map_to_vol}")
     print()
-    print("Sources (anode)")
+    print("刺激电极 (sink)")
     for name, amp in zip(sources, currents[: len(sources)]):
         print(f"  {name:<6} {amp * 1e3:+8.4f} mA")
-    print("Sinks (cathode)")
+    print("回流电极 (source)")
     for name, amp in zip(sinks, currents[len(sources) :]):
         print(f"  {name:<6} {amp * 1e3:+8.4f} mA")
     print()
